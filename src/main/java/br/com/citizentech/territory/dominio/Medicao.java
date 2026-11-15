@@ -45,6 +45,14 @@ public class Medicao {
     }
 
     public Medicao(SensorSimulado sensor, double valor) {
+        this(sensor, valor, LocalDateTime.now());
+    }
+
+    // Permite definir horarios controlados nos testes.
+    Medicao(
+            SensorSimulado sensor,
+            double valor,
+            LocalDateTime dataHora) {
 
         if (sensor == null) {
             throw new DadosInvalidosException(
@@ -54,7 +62,14 @@ public class Medicao {
 
         if (!Double.isFinite(valor) || valor < 0) {
             throw new DadosInvalidosException(
-                "A medicao deve ser um numero valido e nao negativo."
+                "A medicao deve ser um numero valido "
+                + "e nao negativo."
+            );
+        }
+
+        if (dataHora == null) {
+            throw new DadosInvalidosException(
+                "A data e hora da medicao sao obrigatorias."
             );
         }
 
@@ -92,7 +107,7 @@ public class Medicao {
         this.regiao = sensor.getRegiao();
         this.valor = valor;
         this.unidade = sensor.retornarUnidade();
-        this.dataHora = LocalDateTime.now();
+        this.dataHora = dataHora;
     }
 
     public Long getId() {
