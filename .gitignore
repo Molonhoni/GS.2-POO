@@ -1,0 +1,32 @@
+
+# Maven
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# Arquivos locais do banco H2
+data/
+*.mv.db
+*.trace.db
+
+# Logs
+*.log
+logs/
+
+# Variaveis de ambiente
+.env
+.env.*
+
+# Arquivos temporarios
+*.tmp
+*.bak
