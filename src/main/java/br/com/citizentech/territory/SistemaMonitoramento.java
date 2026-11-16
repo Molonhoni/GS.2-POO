@@ -1,5 +1,8 @@
 package br.com.citizentech.territory;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +23,7 @@ import br.com.citizentech.territory.dominio.SensorUmidadeSolo;
 import br.com.citizentech.territory.excecao.DadosInvalidosException;
 import br.com.citizentech.territory.excecao.FonteIndisponivelException;
 import br.com.citizentech.territory.servico.ConfiguracaoSistema;
+import br.com.citizentech.territory.servico.ExportadorHistoricoCsv;
 import br.com.citizentech.territory.servico.ServicoMonitoramento;
 
 public class SistemaMonitoramento {
@@ -32,10 +36,14 @@ public class SistemaMonitoramento {
     private static final DateTimeFormatter DATA =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
+    private static final DateTimeFormatter DATA_ARQUIVO =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
+
     private final ServicoMonitoramento servico;
     private final Scanner entrada;
     private final List<SensorSimulado> sensores;
     private final DadosTerritorio territorio;
+    private final ExportadorHistoricoCsv exportadorCsv;
 
     public SistemaMonitoramento(
             ServicoMonitoramento servico,
@@ -43,6 +51,7 @@ public class SistemaMonitoramento {
 
         this.servico = servico;
         this.entrada = entrada;
+        this.exportadorCsv = new ExportadorHistoricoCsv();
 
         this.sensores = List.of(
             new SensorChuva(
@@ -72,6 +81,7 @@ public class SistemaMonitoramento {
     private String solicitarCodigoInicial() {
 
         while (true) {
+
             String codigo = perguntar(
                 "Defina um codigo de acesso (min. 4 caracteres): "
             );
@@ -121,6 +131,8 @@ public class SistemaMonitoramento {
                     case "7" -> visualizarStatusCompleto();
 
                     case "8" -> alterarStatusSensor();
+
+                    case "9" -> exportarHistoricoCsv();
 
                     case "0" -> {
                         System.out.println(
@@ -175,6 +187,7 @@ public class SistemaMonitoramento {
         System.out.println("6 - Gerenciar dados do territorio");
         System.out.println("7 - Visualizar status completo");
         System.out.println("8 - Ativar/desativar sensor");
+        System.out.println("9 - Exportar historico em CSV");
         System.out.println("0 - Encerrar sistema");
 
         System.out.println(
@@ -216,6 +229,7 @@ public class SistemaMonitoramento {
             return numero;
 
         } catch (NumberFormatException e) {
+
             throw new DadosInvalidosException(
                 "Informe um numero inteiro valido."
             );
@@ -231,6 +245,7 @@ public class SistemaMonitoramento {
             return Double.parseDouble(texto);
 
         } catch (NumberFormatException e) {
+
             throw new DadosInvalidosException(
                 "Informe um valor numerico valido."
             );
@@ -381,12 +396,14 @@ public class SistemaMonitoramento {
                 );
 
                 if (resultado.possuiAlerta()) {
+
                     System.out.println(
                         "ALERTA REGISTRADO: "
                         + resultado.getAlerta().getMensagem()
                     );
 
                 } else {
+
                     System.out.println(
                         "Nenhum alerta necessario."
                     );
@@ -409,16 +426,20 @@ public class SistemaMonitoramento {
             selecionarSensores(false).get(0);
 
         List<Medicao> historico =
-            servico.consultarHistorico(sensor.getId());
+            servico.consultarHistorico(
+                sensor.getId()
+            );
 
         System.out.println(
             "\nHISTORICO: " + sensor.getNome()
         );
 
         if (historico.isEmpty()) {
+
             System.out.println(
                 "Nenhuma medicao encontrada."
             );
+
             return;
         }
 
@@ -447,9 +468,11 @@ public class SistemaMonitoramento {
         System.out.println("\nHISTORICO DE ALERTAS");
 
         if (alertas.isEmpty()) {
+
             System.out.println(
                 "Nenhum alerta registrado."
             );
+
             return;
         }
 
@@ -547,7 +570,8 @@ public class SistemaMonitoramento {
         );
 
         System.out.println(
-            "Regiao monitorada: " + territorio.getRegiao()
+            "Regiao monitorada: "
+            + territorio.getRegiao()
         );
 
         List<Alerta> alertas =
@@ -575,11 +599,13 @@ public class SistemaMonitoramento {
             );
 
             System.out.println(
-                "Medicoes registradas: " + historico.size()
+                "Medicoes registradas: "
+                + historico.size()
             );
 
             System.out.println(
-                "Alertas registrados: " + quantidadeAlertas
+                "Alertas registrados: "
+                + quantidadeAlertas
             );
 
             if (!historico.isEmpty()) {
@@ -598,7 +624,8 @@ public class SistemaMonitoramento {
         mostrarLimiares();
 
         System.out.println(
-            "\nTotal de alertas: " + alertas.size()
+            "\nTotal de alertas: "
+            + alertas.size()
         );
     }
 
@@ -610,8 +637,72 @@ public class SistemaMonitoramento {
         sensor.alterarStatus(!sensor.isAtivo());
 
         System.out.println(
-            "\nNovo status de " + sensor.getNome()
-            + ": " + sensor.verificarStatus()
+            "\nNovo status de "
+            + sensor.getNome()
+            + ": "
+            + sensor.verificarStatus()
         );
+    }
+
+    private void exportarHistoricoCsv() {
+
+        SensorSimulado sensor =
+            selecionarSensores(false).get(0);
+
+        List<Medicao> historico =
+            servico.consultarHistorico(
+                sensor.getId()
+            );
+
+        if (historico.isEmpty()) {
+
+            System.out.println(
+                "\nNao existem medicoes para exportar."
+            );
+
+            return;
+        }
+
+        String nomeArquivo =
+            "historico_"
+            + sensor.getId()
+            + "_"
+            + LocalDateTime.now().format(DATA_ARQUIVO)
+            + ".csv";
+
+        Path destino = Path.of(
+            "data",
+            "exportacoes",
+            nomeArquivo
+        );
+
+        try {
+
+            Path arquivoCriado =
+                exportadorCsv.exportar(
+                    historico,
+                    destino
+                );
+
+            System.out.println(
+                "\nCSV gerado com sucesso!"
+            );
+
+            System.out.println(
+                "Arquivo: " + arquivoCriado
+            );
+
+            System.out.println(
+                "Registros exportados: "
+                + historico.size()
+            );
+
+        } catch (IOException e) {
+
+            System.out.println(
+                "\nErro ao exportar CSV: "
+                + e.getMessage()
+            );
+        }
     }
 }
